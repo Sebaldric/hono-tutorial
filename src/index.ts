@@ -1,8 +1,23 @@
 import { Hono } from "hono";
+import blog from "./blogs/blog";
+import auth from "./auth/auth";
+import { basicAuth } from "hono/basic-auth";
+export const app = new Hono();
 
-const app = new Hono();
+// 認証設定を先に行う
+app.use(
+  "/auth/*",
+  basicAuth({
+    username: "hono",
+    password: "acoolproject",
+  })
+);
 
-let blogPosts = [
+// その後でルーティングを設定
+app.route("/blog", blog);
+app.route("/auth", auth);
+
+export let blogPosts = [
   {
     id: 1,
     title: "My First Blog Post",
@@ -28,23 +43,6 @@ let blogPosts = [
     updatedAt: "2024-01-03",
   },
 ];
-
-app.get("/", (c) => {
-  return c.text("Hello Hono!");
-});
-
-app.get("/blog-posts", (c) => {
-  return c.json({ posts: blogPosts });
-});
-
-app.get("/blog-posts/:id", (c) => {
-  const { id } = c.req.param();
-  const blogPost = blogPosts.find((post) => post.id === parseInt(id));
-  if (!blogPost) {
-    return c.json({ error: "Blog post not found" }, 404);
-  }
-  return c.json({ post: blogPost });
-});
 
 app.post("/posts", async (c) => {
   const { title, content, author } = await c.req.json<{
@@ -79,7 +77,7 @@ app.put("/posts/:id", async (c) => {
   blogPost.content = content;
   blogPost.author = author;
   blogPost.updatedAt = new Date().toISOString();
-  return c.json({ post: blogPost });
+  return c.json({ post: blogPost }, 200);
 });
 
 app.delete("/posts/:id", (c) => {
