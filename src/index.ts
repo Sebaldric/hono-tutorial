@@ -40,7 +40,56 @@ app.get("/blog-posts", (c) => {
 app.get("/blog-posts/:id", (c) => {
   const { id } = c.req.param();
   const blogPost = blogPosts.find((post) => post.id === parseInt(id));
+  if (!blogPost) {
+    return c.json({ error: "Blog post not found" }, 404);
+  }
   return c.json({ post: blogPost });
+});
+
+app.post("/posts", async (c) => {
+  const { title, content, author } = await c.req.json<{
+    title: string;
+    content: string;
+    author: string;
+  }>();
+  const newPost = {
+    id: blogPosts.length + 1,
+    title: title,
+    content: content,
+    author: author,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  blogPosts.push(newPost);
+  return c.json({ post: newPost }, 201);
+});
+
+app.put("/posts/:id", async (c) => {
+  const { id } = c.req.param();
+  const { title, content, author } = await c.req.json<{
+    title: string;
+    content: string;
+    author: string;
+  }>();
+  const blogPost = blogPosts.find((post) => post.id === parseInt(id));
+  if (!blogPost) {
+    return c.json({ error: "Blog post not found" }, 404);
+  }
+  blogPost.title = title;
+  blogPost.content = content;
+  blogPost.author = author;
+  blogPost.updatedAt = new Date().toISOString();
+  return c.json({ post: blogPost });
+});
+
+app.delete("/posts/:id", (c) => {
+  const { id } = c.req.param();
+  const blogPost = blogPosts.find((post) => post.id === parseInt(id));
+  if (!blogPost) {
+    return c.json({ error: "Blog post not found" }, 404);
+  }
+  blogPosts = blogPosts.filter((post) => post.id !== parseInt(id));
+  return c.json({ message: "Blog post deleted" }, 200);
 });
 
 export default app;
