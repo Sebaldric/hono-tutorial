@@ -1,93 +1,97 @@
 import { Hono } from "hono";
-import blog from "./blogs/blog";
-import auth from "./auth/auth";
-import { basicAuth } from "hono/basic-auth";
-export const app = new Hono();
+import { drizzle } from "drizzle-orm/d1";
+import { eq } from "drizzle-orm";
+import { todos } from "./drizzle/schema";
+import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
+import type { DrizzleD1Database } from "drizzle-orm/d1";
 
-// 認証設定を先に行う
-app.use(
-  "/auth/*",
-  basicAuth({
-    username: "hono",
-    password: "acoolproject",
-  })
-);
+type Bindings = {
+  DB: D1Database;
+};
 
-// その後でルーティングを設定
-app.route("/blog", blog);
-app.route("/auth", auth);
+type Variables = {
+  db: DrizzleD1Database;
+};
 
-export let blogPosts = [
-  {
-    id: 1,
-    title: "My First Blog Post",
-    content: "This is my first blog post",
-    author: "John Doe",
-    createdAt: "2024-01-01",
-    updatedAt: "2024-01-01",
-  },
-  {
-    id: 2,
-    title: "My Second Blog Post",
-    content: "This is my second blog post",
-    author: "Jane Doe",
-    createdAt: "2024-01-02",
-    updatedAt: "2024-01-02",
-  },
-  {
-    id: 3,
-    title: "My Third Blog Post",
-    content: "This is my third blog post",
-    author: "John Doe",
-    createdAt: "2024-01-03",
-    updatedAt: "2024-01-03",
-  },
-];
+const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
-app.post("/posts", async (c) => {
-  const { title, content, author } = await c.req.json<{
-    title: string;
-    content: string;
-    author: string;
-  }>();
-  const newPost = {
-    id: blogPosts.length + 1,
-    title: title,
-    content: content,
-    author: author,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-  blogPosts.push(newPost);
-  return c.json({ post: newPost }, 201);
+// Middleware: drizzleのセットアップ
+app.use("*", async (c, next) => {
+  const db = drizzle(c.env.DB);
+  c.set("db", db);
+  await next();
 });
 
-app.put("/posts/:id", async (c) => {
-  const { id } = c.req.param();
-  const { title, content, author } = await c.req.json<{
-    title: string;
-    content: string;
-    author: string;
-  }>();
-  const blogPost = blogPosts.find((post) => post.id === parseInt(id));
-  if (!blogPost) {
-    return c.json({ error: "Blog post not found" }, 404);
-  }
-  blogPost.title = title;
-  blogPost.content = content;
-  blogPost.author = author;
-  blogPost.updatedAt = new Date().toISOString();
-  return c.json({ post: blogPost }, 200);
+// バリデーションスキーマ
+const todoSchema = z.object({
+  title: z.string().min(1),
+  content: z.string().min(1),
+  author: z.string().min(1),
 });
 
-app.delete("/posts/:id", (c) => {
-  const { id } = c.req.param();
-  const blogPost = blogPosts.find((post) => post.id === parseInt(id));
-  if (!blogPost) {
-    return c.json({ error: "Blog post not found" }, 404);
-  }
-  blogPosts = blogPosts.filter((post) => post.id !== parseInt(id));
-  return c.json({ message: "Blog post deleted" }, 200);
+// 全TODOの取得
+app.get("/todos", async (c) => {
+  const db = c.get("db");
+  const items = await db.select().from(todos).all();
+  return c.json(items);
+});
+
+// 新規TODO作成
+app.post("/todos", zValidator("json", todoSchema), async (c) => {
+  const db = c.get("db");
+  const body = c.req.valid("json");
+
+  const todo = await db
+    .insert(todos)
+    .values({
+      id: crypto.randomUUID(),
+      title: body.title,
+      content: body.content,
+      author: body.author,
+    })
+    .returning()
+    .get();
+
+  return c.json(todo, 201);
+});
+
+// 特定のTODOを取得
+app.get("/todos/:id", async (c) => {
+  const db = c.get("db");
+  const id = c.req.param("id");
+
+  const todo = await db.select().from(todos).where(eq(todos.id, id)).get();
+
+  if (!todo) return c.json({ message: "Not found" }, 404);
+  return c.json(todo);
+});
+
+// TODOの更新
+app.put("/todos/:id", zValidator("json", todoSchema), async (c) => {
+  const db = c.get("db");
+  const id = c.req.param("id");
+  const body = c.req.valid("json");
+
+  const todo = await db
+    .update(todos)
+    .set(body)
+    .where(eq(todos.id, id))
+    .returning()
+    .get();
+
+  if (!todo) return c.json({ message: "Not found" }, 404);
+  return c.json(todo);
+});
+
+// TODOの削除
+app.delete("/todos/:id", async (c) => {
+  const db = c.get("db");
+  const id = c.req.param("id");
+
+  await db.delete(todos).where(eq(todos.id, id)).run();
+
+  return c.json({ message: "Deleted" }, 200);
 });
 
 export default app;
