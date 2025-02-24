@@ -4,66 +4,72 @@ https://hono.template-beachovin-meta.workers.dev/
 
 ## API エンドポイント
 
-### ブログ投稿
+### TODO リスト
 
-#### 全ての投稿を取得
+#### 全ての TODO を取得
 
-- `GET /blog`
-- レスポンス: `{ posts: BlogPost[] }`
+- `GET /todos`
+- レスポンス: `Todo[]`
 
-#### 特定の投稿を取得
+#### 特定の TODO を取得
 
-- `GET /blog/:id`
-- レスポンス: `{ post: BlogPost }` または 404 エラー
+- `GET /todos/:id`
+- レスポンス: `Todo` または `{ message: "Not found" }` (404)
 
-#### 新規投稿を作成
+#### 新規 TODO を作成
 
-- `POST /posts`
+- `POST /todos`
 - ボディ:
-  json
-  {
-  "title": "投稿タイトル",
-  "content": "投稿内容",
-  "author": "著者名"
-  }
 
-- レスポンス: `{ post: BlogPost }` (201 Created)
+```json
+{
+  "title": "タイトル",
+  "content": "内容",
+  "author": "作成者"
+}
+```
 
-#### 投稿を更新
+- レスポンス: `Todo` (201 Created)
 
-- `PUT /posts/:id`
+#### TODO を更新
+
+- `PUT /todos/:id`
 - ボディ:
-  json
-  {
+
+```json
+{
   "title": "更新タイトル",
   "content": "更新内容",
-  "author": "更新著者名"
-  }
+  "author": "更新者"
+}
+```
 
-- レスポンス: `{ post: BlogPost }` または 404 エラー
+- レスポンス: `Todo` または `{ message: "Not found" }` (404)
 
-#### 投稿を削除
+#### TODO を削除
 
-- `DELETE /posts/:id`
-- レスポンス: `{ message: "Blog post deleted" }` または 404 エラー
-
-### 認証エンドポイント
-
-- `GET /auth/page`
-- Basic 認証必須
-  - ユーザー名: `hono`
-  - パスワード: `acoolproject`
-- レスポンス: "Hello Hono!"
+- `DELETE /todos/:id`
+- レスポンス: `{ message: "Deleted" }` (200)
 
 ## データ構造
 
-### BlogPost
+### Todo
 
+```typescript
 {
-　　 id: number;
-　　 title: string;
-　　 content: string;
-　　 author: string;
-　　 createdAt: string;
-　　 updatedAt: string;
+  id: string;
+  title: string;
+  content: string;
+  author: string;
+  createdAt: string;
+  updatedAt: string;
 }
+```
+
+## バリデーション
+
+リクエストボディは以下のバリデーションが適用されます：
+
+- `title`: 1 文字以上の文字列
+- `content`: 1 文字以上の文字列
+- `author`: 1 文字以上の文字列
